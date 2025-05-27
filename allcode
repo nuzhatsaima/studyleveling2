@@ -1,0 +1,320 @@
+//Task->Reward
+package models;
+
+public class Reward {
+    public String name;
+    public int cost;
+    public boolean isUnlocked;
+
+    public Reward(String name, int cost) {
+        this.name = name;
+        this.cost = cost;
+        this.isUnlocked =false;
+}
+}
+//Task->Task
+package models;
+
+public class Task {
+    public String description;
+    public boolean isCompleted;
+    public int xpReward;
+    public int coinReward;
+
+    public Task(String description, int xpReward, int coinReward) {
+        this.description = description;
+        this.xpReward = xpReward;
+        this.coinReward = coinReward;
+        this.isCompleted = false;
+    }
+
+    @Override
+    public String toString() {
+        return (isCompleted ? "[✓] " : "[ ] ") + description + " (XP: " + xpReward + ", Coins: " +coinReward+")";}
+}
+
+//Task->User
+package models;
+
+public class User {
+    public String username;
+    public int xp;
+    public int level;
+    public int coins;
+
+    public User(String username) {
+        this.username = username;
+        this.xp = 0;
+        this.level = 1;
+        this.coins = 0;
+    }
+
+    public void addXP(int amount) {
+        System.out.println("Adding XP: " + amount);
+        System.out.println("Before → XP: " + xp + ", Level: " + level + ", Coins: " + coins);
+
+        xp += amount;
+
+        while (xp >= xpNeeded(level)) {
+            xp -= xpNeeded(level);
+            level++;
+            coins += 50;
+            System.out.println("Leveled up! → Level: " + level + ", Coins: " + coins);
+        }
+
+        System.out.println("After → XP: " + xp + ", Level: " + level + ", Coins: " + coins);
+    }
+
+    public int xpNeeded(int level) {
+        return 100 * (int) Math.pow(1.5, level-1);
+}
+}
+
+//ui->MainMenu
+
+package ui;
+
+import models.User;
+
+import javax.swing.*;
+import java.awt.*;
+
+public class MainMenu extends JFrame {
+    public static User user = new User("GUEST");
+
+    private JLabel levelLabel;
+    private JLabel xpLabel;
+
+    public MainMenu() {
+        setTitle("📘 Study Leveling");
+        setSize(800, 600);
+        setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+        setLocationRelativeTo(null);
+        setLayout(null);
+        getContentPane().setBackground(new Color(173, 216, 230));
+
+        JLabel userLabel = new JLabel("USER: " + user.username);
+        userLabel.setBounds(30, 20, 200, 30);
+        userLabel.setForeground(Color.WHITE);
+        userLabel.setOpaque(true);
+        userLabel.setBackground(new Color(199, 21, 133));
+        userLabel.setFont(new Font("Monospaced", Font.BOLD, 14));
+        userLabel.setHorizontalAlignment(SwingConstants.CENTER);
+        userLabel.setBorder(BorderFactory.createLineBorder(Color.WHITE));
+
+        levelLabel = new JLabel("LEVEL: " + user.level);
+        levelLabel.setBounds(570, 20, 180, 30);
+        levelLabel.setForeground(Color.WHITE);
+        levelLabel.setOpaque(true);
+        levelLabel.setBackground(new Color(199, 21, 133));
+        levelLabel.setFont(new Font("Monospaced", Font.BOLD, 14));
+        levelLabel.setHorizontalAlignment(SwingConstants.CENTER);
+
+        xpLabel = new JLabel("XP: " + user.xp);
+        xpLabel.setBounds(570, 60, 180, 30);
+        xpLabel.setForeground(Color.WHITE);
+        xpLabel.setOpaque(true);
+        xpLabel.setBackground(new Color(199, 21, 133));
+        xpLabel.setFont(new Font("Monospaced", Font.BOLD, 14));
+        xpLabel.setHorizontalAlignment(SwingConstants.CENTER);
+
+        JPanel centralPanel = new JPanel();
+        centralPanel.setBounds(200, 150, 400, 300);
+        centralPanel.setBackground(Color.BLACK);
+        centralPanel.setLayout(new GridLayout(4, 1, 10, 10));
+
+        JLabel title = new JLabel("STUDY LEVELING");
+        title.setForeground(Color.YELLOW);
+        title.setFont(new Font("Monospaced", Font.BOLD, 22));
+        title.setHorizontalAlignment(SwingConstants.CENTER);
+
+        JButton startButton = createStyledButton("START");
+        JButton rewardsButton = createStyledButton("REWARDS");
+        JButton progressButton = createStyledButton("PROGRESS");
+
+        startButton.addActionListener(e -> new StudyScreen(this));
+        rewardsButton.addActionListener(e -> new RewardScreen());
+        progressButton.addActionListener(e -> new ProgressScreen());
+
+        centralPanel.add(title);
+        centralPanel.add(startButton);
+        centralPanel.add(rewardsButton);
+        centralPanel.add(progressButton);
+
+        add(userLabel);
+        add(levelLabel);
+        add(xpLabel);
+        add(centralPanel);
+
+        setVisible(true);
+    }
+
+    public void refreshStats() {
+        levelLabel.setText("LEVEL: " + user.level);
+        xpLabel.setText("XP: " + user.xp);
+    }
+
+    private JButton createStyledButton(String text) {
+        JButton button = new JButton(text);
+        button.setFocusPainted(false);
+        button.setBackground(new Color(147, 112, 219));
+        button.setForeground(Color.WHITE);
+        button.setFont(new Font("Monospaced", Font.BOLD, 16));
+        button.setBorder(BorderFactory.createLineBorder(Color.BLACK, 2));
+        return button;
+    }
+
+    public static void main(String[] args) {
+        new MainMenu();
+}
+}
+
+//ui->StudyScreen
+package ui;
+
+import models.Task;
+
+import javax.swing.*;
+import java.awt.*;
+
+public class StudyScreen extends JFrame {
+    private final DefaultListModel<Task> taskListModel = new DefaultListModel<>();
+    private final JList<Task> taskList = new JList<>(taskListModel);
+    private final JTextField taskField = new JTextField();
+    private final JTextField xpField = new JTextField("50", 3);
+    private final JTextField coinField = new JTextField("20", 3);
+    private final MainMenu mainMenu;
+
+    public StudyScreen(MainMenu mainMenu) {
+        this.mainMenu = mainMenu;
+
+        setTitle("Study Tasks");
+        setSize(500, 400);
+        setLocationRelativeTo(null);
+        setLayout(new BorderLayout());
+
+        JButton addTask = new JButton("Add Task");
+        JButton completeTask = new JButton("Complete Task");
+        JButton deleteTask = new JButton("Delete Task");
+
+        // Add Task logic
+        addTask.addActionListener(e -> {
+            String desc = taskField.getText().trim();
+            if (!desc.isEmpty()) {
+                try {
+                    int xp = Integer.parseInt(xpField.getText().trim());
+                    int coins = Integer.parseInt(coinField.getText().trim());
+                    taskListModel.addElement(new Task(desc, xp, coins));
+                    taskField.setText("");
+                } catch (NumberFormatException ex) {
+                    JOptionPane.showMessageDialog(this, "XP and Coins must be numbers.");
+                }
+            }
+        });
+
+        // Complete Task logic
+        completeTask.addActionListener(e -> {
+            Task task = taskList.getSelectedValue();
+            if (task != null && !task.isCompleted) {
+                task.isCompleted = true;
+                MainMenu.user.addXP(task.xpReward);
+                MainMenu.user.coins += task.coinReward;
+
+                JOptionPane.showMessageDialog(this,
+                        "Task Completed!\n+ " + task.xpReward + " XP\n+ " + task.coinReward + " Coins");
+
+                taskList.repaint();
+                mainMenu.refreshStats();
+            }
+        });
+
+        // Delete Task logic
+        deleteTask.addActionListener(e -> {
+            Task selected = taskList.getSelectedValue();
+            if (selected != null) {
+                taskListModel.removeElement(selected);
+            }
+        });
+
+        // Input Panels
+        JPanel inputPanel = new JPanel(new BorderLayout());
+        JPanel rewardPanel = new JPanel(new GridLayout(1, 4));
+        rewardPanel.add(new JLabel("XP:"));
+        rewardPanel.add(xpField);
+        rewardPanel.add(new JLabel("Coins:"));
+        rewardPanel.add(coinField);
+
+        JPanel topPanel = new JPanel(new BorderLayout());
+        topPanel.add(taskField, BorderLayout.CENTER);
+        topPanel.add(addTask, BorderLayout.EAST);
+        inputPanel.add(topPanel, BorderLayout.NORTH);
+        inputPanel.add(rewardPanel, BorderLayout.SOUTH);
+
+        JPanel buttons = new JPanel();
+        buttons.add(completeTask);
+        buttons.add(deleteTask);
+
+        add(inputPanel, BorderLayout.NORTH);
+        add(new JScrollPane(taskList), BorderLayout.CENTER);
+        add(buttons, BorderLayout.SOUTH);
+
+        setVisible(true);
+}
+}
+//ui->RewardScreen
+package ui;
+
+import models.Reward;
+import models.User;
+
+import javax.swing.*;
+import java.awt.*;
+import java.util.ArrayList;
+
+public class RewardScreen extends JFrame {
+    private final java.util.List<Reward> rewards = new ArrayList<>();
+
+    public RewardScreen() {
+        setTitle("Reward Shop");
+        setSize(400, 300);
+        setLayout(new GridLayout(0, 1));
+
+        rewards.add(new Reward("Cool Avatar", 100));
+        rewards.add(new Reward("Night Theme", 150));
+        rewards.add(new Reward("Badge of Honor", 200));
+
+        for (Reward r : rewards) {
+            JButton btn = new JButton(r.name + " - " + r.cost + " coins");
+            btn.setEnabled(!r.isUnlocked);
+            btn.addActionListener(e -> {
+                if (MainMenu.user.coins >= r.cost && !r.isUnlocked) {
+                    MainMenu.user.coins -= r.cost;
+                    r.isUnlocked = true;
+                    btn.setText(r.name + " (Unlocked)");
+                    btn.setEnabled(false);
+                } else {
+                    JOptionPane.showMessageDialog(this, "Not enough coins!");
+                }
+            });
+            add(btn);
+        }
+
+        setVisible(true);
+}
+}
+
+//ui->ProgressScreen
+
+//app
+import ui.MainMenu;
+
+import javax.swing.*;
+
+public class App {
+    public static void main(String[] args) {
+        SwingUtilities.invokeLater(() -> {
+            new MainMenu();
+        });
+    }
+}
+
