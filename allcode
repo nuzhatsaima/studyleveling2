@@ -1,46 +1,101 @@
-//Task->Reward
+//models->Reward
 package models;
 
 public class Reward {
-    public String name;
-    public int cost;
-    public boolean isUnlocked;
+    private String name;
+    private int cost;
 
     public Reward(String name, int cost) {
         this.name = name;
         this.cost = cost;
-        this.isUnlocked =false;
-}
-}
-//Task->Task
-package models;
+    }
 
-public class Task {
-    public String description;
-    public boolean isCompleted;
-    public int xpReward;
-    public int coinReward;
+    public String getName() {
+        return name;
+    }
 
-    public Task(String description, int xpReward, int coinReward) {
-        this.description = description;
-        this.xpReward = xpReward;
-        this.coinReward = coinReward;
-        this.isCompleted = false;
+    public int getCost() {
+        return cost;
     }
 
     @Override
     public String toString() {
-        return (isCompleted ? "[✓] " : "[ ] ") + description + " (XP: " + xpReward + ", Coins: " +coinReward+")";}
+        return name + " - " + cost + " POINTS";
+    }
 }
-
-//Task->User
+//models->Task
 package models;
 
+public class Task {
+    private String description;
+    private int xpReward;
+    private int coinReward;
+    private Difficulty difficulty;
+    private boolean completed;
+
+    public enum Difficulty {
+        EASY, MEDIUM, HARD
+    }
+
+    // No-arg constructor for Gson
+    public Task() {
+        this.description = "";
+        this.xpReward = 0;
+        this.coinReward = 0;
+        this.difficulty = Difficulty.EASY;
+        this.completed = false;
+    }
+
+    public Task(String description, int xp, int coins, Difficulty difficulty) {
+        this.description = description;
+        this.xpReward = xp;
+        this.coinReward = coins;
+        this.difficulty = (difficulty != null) ? difficulty : Difficulty.EASY;
+        this.completed = false;
+    }
+
+    public String getDescription() {
+        return description;
+    }
+
+    public int getXpReward() {
+        return xpReward;
+    }
+
+    public int getCoinReward() {
+        return coinReward;
+    }
+
+    public Difficulty getDifficulty() {
+        return (difficulty != null) ? difficulty : Difficulty.EASY;
+    }
+
+    public boolean isCompleted() {
+        return completed;
+    }
+
+    public void setCompleted(boolean completed) {
+        this.completed = completed;
+    }
+
+    @Override
+    public String toString() {
+        return (completed ? "[✓] " : "[ ] ") + description +
+                " (XP: " + xpReward + ", Coins: " + coinReward + ", Difficulty: " + getDifficulty()+")";
+}
+}
+
+//models->User
+package models;
+
+import java.util.ArrayList;
+
 public class User {
-    public String username;
-    public int xp;
-    public int level;
-    public int coins;
+    private String username;
+    private int xp;
+    private int level;
+    private int coins;
+    private ArrayList<Task> tasks = new ArrayList<>();
 
     public User(String username) {
         this.username = username;
@@ -49,25 +104,54 @@ public class User {
         this.coins = 0;
     }
 
+    // Getter methods
+    public String getUsername() {
+        return username;
+    }
+
+    public int getXp() {
+        return xp;
+    }
+
+    public int getLevel() {
+        return level;
+    }
+
+    public int getCoins() {
+        return coins;
+    }
+
+    public ArrayList<Task> getTasks() {
+        return tasks;
+    }
+
+    // Add XP and handle leveling up
     public void addXP(int amount) {
-        System.out.println("Adding XP: " + amount);
-        System.out.println("Before → XP: " + xp + ", Level: " + level + ", Coins: " + coins);
-
         xp += amount;
-
         while (xp >= xpNeeded(level)) {
             xp -= xpNeeded(level);
             level++;
-            coins += 50;
-            System.out.println("Leveled up! → Level: " + level + ", Coins: " + coins);
+            coins += 50; // bonus on level-up
         }
-
-        System.out.println("After → XP: " + xp + ", Level: " + level + ", Coins: " + coins);
+    }
+    public boolean spendCoins(int amount) {
+        if (coins >= amount) {
+            coins -= amount;
+            return true;
+        } else {
+            return false;
+        }
     }
 
+    // Add coins safely
+    public void addCoins(int amount) {
+        coins += amount;
+    }
+
+    // XP required for next level
     public int xpNeeded(int level) {
-        return 100 * (int) Math.pow(1.5, level-1);
-}
+        return 100 * (int) Math.pow(1.5, level - 1);
+    }
 }
 
 //ui->MainMenu
@@ -75,17 +159,21 @@ public class User {
 package ui;
 
 import models.User;
+import util.FirebaseManager;
 
 import javax.swing.*;
 import java.awt.*;
 
 public class MainMenu extends JFrame {
-    public static User user = new User("GUEST");
+    private User user;
 
     private JLabel levelLabel;
     private JLabel xpLabel;
+    private JLabel coinLabel;
 
-    public MainMenu() {
+    public MainMenu(User user) {
+        this.user = user;
+
         setTitle("📘 Study Leveling");
         setSize(800, 600);
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
@@ -93,35 +181,26 @@ public class MainMenu extends JFrame {
         setLayout(null);
         getContentPane().setBackground(new Color(173, 216, 230));
 
-        JLabel userLabel = new JLabel("USER: " + user.username);
+        JLabel userLabel = new JLabel("👤 USER: " + user.getUsername());
         userLabel.setBounds(30, 20, 200, 30);
-        userLabel.setForeground(Color.WHITE);
-        userLabel.setOpaque(true);
-        userLabel.setBackground(new Color(199, 21, 133));
-        userLabel.setFont(new Font("Monospaced", Font.BOLD, 14));
-        userLabel.setHorizontalAlignment(SwingConstants.CENTER);
-        userLabel.setBorder(BorderFactory.createLineBorder(Color.WHITE));
+        styleTopLabel(userLabel);
 
-        levelLabel = new JLabel("LEVEL: " + user.level);
+        levelLabel = new JLabel("🧪 LEVEL: " + user.getLevel());
         levelLabel.setBounds(570, 20, 180, 30);
-        levelLabel.setForeground(Color.WHITE);
-        levelLabel.setOpaque(true);
-        levelLabel.setBackground(new Color(199, 21, 133));
-        levelLabel.setFont(new Font("Monospaced", Font.BOLD, 14));
-        levelLabel.setHorizontalAlignment(SwingConstants.CENTER);
+        styleTopLabel(levelLabel);
 
-        xpLabel = new JLabel("XP: " + user.xp);
+        xpLabel = new JLabel("⭐ XP: " + user.getXp());
         xpLabel.setBounds(570, 60, 180, 30);
-        xpLabel.setForeground(Color.WHITE);
-        xpLabel.setOpaque(true);
-        xpLabel.setBackground(new Color(199, 21, 133));
-        xpLabel.setFont(new Font("Monospaced", Font.BOLD, 14));
-        xpLabel.setHorizontalAlignment(SwingConstants.CENTER);
+        styleTopLabel(xpLabel);
+
+        coinLabel = new JLabel("💰 COINS: " + user.getCoins());
+        coinLabel.setBounds(570, 100, 180, 30);
+        styleTopLabel(coinLabel);
 
         JPanel centralPanel = new JPanel();
-        centralPanel.setBounds(200, 150, 400, 300);
+        centralPanel.setBounds(200, 150, 400, 420);
         centralPanel.setBackground(Color.BLACK);
-        centralPanel.setLayout(new GridLayout(4, 1, 10, 10));
+        centralPanel.setLayout(new GridLayout(6, 1, 10, 10));
 
         JLabel title = new JLabel("STUDY LEVELING");
         title.setForeground(Color.YELLOW);
@@ -131,27 +210,50 @@ public class MainMenu extends JFrame {
         JButton startButton = createStyledButton("START");
         JButton rewardsButton = createStyledButton("REWARDS");
         JButton progressButton = createStyledButton("PROGRESS");
+        JButton multiplayerButton = createStyledButton("MULTIPLAYER MODE");
+        JButton leaderboardButton = createStyledButton("GLOBAL LEADERBOARD");
 
         startButton.addActionListener(e -> new StudyScreen(this));
-        rewardsButton.addActionListener(e -> new RewardScreen());
+        rewardsButton.addActionListener(e -> new RewardScreen(user, this));
         progressButton.addActionListener(e -> new ProgressScreen());
+        multiplayerButton.addActionListener(e -> openMultiplayerMode());
+        leaderboardButton.addActionListener(e -> new GlobalLeaderboardScreen());
 
         centralPanel.add(title);
         centralPanel.add(startButton);
         centralPanel.add(rewardsButton);
         centralPanel.add(progressButton);
+        centralPanel.add(multiplayerButton);
+        centralPanel.add(leaderboardButton);
 
         add(userLabel);
         add(levelLabel);
         add(xpLabel);
+        add(coinLabel);
         add(centralPanel);
 
         setVisible(true);
+
+        // Upload user stats to Firebase
+        FirebaseManager.uploadUserStats(user);
+    }
+    public User getUser() {
+        return user;
     }
 
     public void refreshStats() {
-        levelLabel.setText("LEVEL: " + user.level);
-        xpLabel.setText("XP: " + user.xp);
+        levelLabel.setText("🧪 LEVEL: " + user.getLevel());
+        xpLabel.setText("⭐ XP: " + user.getXp());
+        coinLabel.setText("💰 COINS: " + user.getCoins());
+    }
+
+    private void styleTopLabel(JLabel label) {
+        label.setForeground(Color.WHITE);
+        label.setOpaque(true);
+        label.setBackground(new Color(199, 21, 133));
+        label.setFont(new Font("Monospaced", Font.BOLD, 14));
+        label.setHorizontalAlignment(SwingConstants.CENTER);
+        label.setBorder(BorderFactory.createLineBorder(Color.WHITE));
     }
 
     private JButton createStyledButton(String text) {
@@ -164,157 +266,1083 @@ public class MainMenu extends JFrame {
         return button;
     }
 
-    public static void main(String[] args) {
-        new MainMenu();
-}
+    private void openMultiplayerMode() {
+        String[] options = {"2", "3", "4"};
+        String input = (String) JOptionPane.showInputDialog(
+                this,
+                "Select number of players:",
+                "Multiplayer Mode",
+                JOptionPane.PLAIN_MESSAGE,
+                null,
+                options,
+                "2"
+        );
+        if (input != null) {
+            int numPlayers = Integer.parseInt(input);
+            new MultiplayerLoginScreen(numPlayers);
+        }
+    }
 }
 
 //ui->StudyScreen
+Create new scratch file from selection
+
+//ui->RewardScreen
 package ui;
 
-import models.Task;
+import javax.swing.*;
+import java.awt.*;
+import java.util.List;
+import java.util.Arrays;
+import models.User;
+import models.Reward;
+
+public class RewardScreen extends JFrame {
+    private User user;
+    private JLabel coinsLabel;
+    private MainMenu mainMenu;
+
+    public RewardScreen(User user, MainMenu mainMenu) {
+        this.user = user;
+        this.mainMenu = mainMenu;
+
+        setTitle("Break Rewards");
+        setSize(800, 600);
+        setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
+        setLocationRelativeTo(null);
+
+        List<Reward> rewards = Arrays.asList(
+                new Reward("NETFLIX 30 MINS", 150),
+                new Reward("VIDEO GAMES", 250),
+                new Reward("GO OUT", 150),
+                new Reward("1 HOUR BREAK", 300)
+        );
+
+        JPanel mainPanel = new JPanel(new BorderLayout());
+        mainPanel.setBackground(new Color(147, 184, 239));
+
+        JPanel rewardsPanel = new JPanel(new GridLayout(0, 1, 20, 20));
+        rewardsPanel.setBorder(BorderFactory.createEmptyBorder(40, 40, 40, 40));
+        rewardsPanel.setBackground(new Color(147, 184, 239));
+
+        for (Reward reward : rewards) {
+            rewardsPanel.add(createRewardPanel(reward));
+        }
+
+        coinsLabel = new JLabel("Coins: " + user.getCoins());
+        coinsLabel.setFont(new Font("Arial", Font.BOLD, 18));
+        coinsLabel.setHorizontalAlignment(SwingConstants.CENTER);
+        coinsLabel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
+
+        mainPanel.add(coinsLabel, BorderLayout.NORTH);
+        mainPanel.add(rewardsPanel, BorderLayout.CENTER);
+
+        add(mainPanel);
+        setVisible(true);
+    }
+
+    private JPanel createRewardPanel(Reward reward) {
+        JPanel panel = new JPanel(new BorderLayout());
+        panel.setBackground(new Color(255, 222, 102));
+        panel.setBorder(BorderFactory.createLineBorder(Color.BLACK));
+        panel.setPreferredSize(new Dimension(300, 60));
+
+        JLabel label = new JLabel(reward.toString());
+        label.setFont(new Font("Arial", Font.PLAIN, 16));
+        label.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
+
+        JButton buyButton = new JButton("Buy");
+        buyButton.addActionListener(e -> {
+            if (user.spendCoins(reward.getCost())) {
+                JOptionPane.showMessageDialog(null, "You redeemed: " + reward.getName());
+                coinsLabel.setText("Coins: " + user.getCoins());
+                mainMenu.refreshStats();  // Updates MainMenu
+            } else {
+                JOptionPane.showMessageDialog(null, "Not enough coins!");
+            }
+        });
+
+        panel.add(label, BorderLayout.CENTER);
+        panel.add(buyButton, BorderLayout.EAST);
+
+        return panel;
+    }
+}
+
+
+//ui->ProgressScreen
+package ui;
+
+public class ProgressScreen {
+}
+//ui->LoginScreen
+package ui;
+
+import models.User;
+import util.DataManager;
 
 import javax.swing.*;
 import java.awt.*;
 
-public class StudyScreen extends JFrame {
-    private final DefaultListModel<Task> taskListModel = new DefaultListModel<>();
-    private final JList<Task> taskList = new JList<>(taskListModel);
-    private final JTextField taskField = new JTextField();
-    private final JTextField xpField = new JTextField("50", 3);
-    private final JTextField coinField = new JTextField("20", 3);
-    private final MainMenu mainMenu;
+public class LoginScreen extends JFrame {
 
-    public StudyScreen(MainMenu mainMenu) {
-        this.mainMenu = mainMenu;
+    private final JTextField usernameField = new JTextField(15);
+    private final JPasswordField passwordField = new JPasswordField(15);
+    private final JLabel messageLabel = new JLabel(" ");
 
-        setTitle("Study Tasks");
+    public LoginScreen() {
+        setTitle("🔐 Study Leveling - Login");
+        setSize(420, 280);
+        setDefaultCloseOperation(EXIT_ON_CLOSE);
+        setLocationRelativeTo(null);
+        setLayout(new GridBagLayout());
+        getContentPane().setBackground(new Color(173, 216, 230)); // Light blue
+
+        GridBagConstraints gbc = new GridBagConstraints();
+        gbc.insets = new Insets(10, 12, 10, 12);
+
+        // Title
+        JLabel titleLabel = new JLabel("📘 Study Leveling Login");
+        titleLabel.setFont(new Font("Monospaced", Font.BOLD, 20));
+        titleLabel.setForeground(new Color(60, 60, 60));
+        gbc.gridwidth = 2;
+        gbc.gridx = 0;
+        gbc.gridy = 0;
+        add(titleLabel, gbc);
+
+        // Username label & field
+        JLabel usernameLabel = new JLabel("👤 Username:");
+        usernameLabel.setFont(new Font("Monospaced", Font.BOLD, 14));
+        gbc.gridwidth = 1;
+        gbc.gridx = 0;
+        gbc.gridy = 1;
+        gbc.anchor = GridBagConstraints.EAST;
+        add(usernameLabel, gbc);
+
+        gbc.gridx = 1;
+        gbc.anchor = GridBagConstraints.WEST;
+        add(usernameField, gbc);
+
+        // Password label & field
+        JLabel passwordLabel = new JLabel("🔑 Password:");
+        passwordLabel.setFont(new Font("Monospaced", Font.BOLD, 14));
+        gbc.gridx = 0;
+        gbc.gridy = 2;
+        gbc.anchor = GridBagConstraints.EAST;
+        add(passwordLabel, gbc);
+
+        gbc.gridx = 1;
+        gbc.anchor = GridBagConstraints.WEST;
+        add(passwordField, gbc);
+
+        // Message Label
+        messageLabel.setFont(new Font("Monospaced", Font.BOLD, 12));
+        messageLabel.setForeground(Color.RED);
+        gbc.gridwidth = 2;
+        gbc.gridx = 0;
+        gbc.gridy = 3;
+        gbc.anchor = GridBagConstraints.CENTER;
+        add(messageLabel, gbc);
+
+        // Buttons
+        JButton signInButton = createStyledButton("🚪 Sign In");
+        JButton signUpButton = createStyledButton("🆕 Sign Up");
+
+        signInButton.addActionListener(e -> signIn());
+        signUpButton.addActionListener(e -> signUp());
+
+        JPanel buttonPanel = new JPanel();
+        buttonPanel.setBackground(new Color(173, 216, 230));
+        buttonPanel.add(signInButton);
+        buttonPanel.add(signUpButton);
+
+        gbc.gridy = 4;
+        add(buttonPanel, gbc);
+
+        setVisible(true);
+    }
+
+    private JButton createStyledButton(String text) {
+        JButton button = new JButton(text);
+        button.setFocusPainted(false);
+        button.setBackground(new Color(147, 112, 219));
+        button.setForeground(Color.WHITE);
+        button.setFont(new Font("Monospaced", Font.BOLD, 14));
+        button.setBorder(BorderFactory.createLineBorder(Color.BLACK, 2));
+        return button;
+    }
+
+    private void signIn() {
+        String username = usernameField.getText().trim();
+        String password = new String(passwordField.getPassword());
+
+        if (username.isEmpty() || password.isEmpty()) {
+            setMessage("❗ Enter both username and password!", Color.RED);
+            return;
+        }
+
+        if (!DataManager.userExists(username)) {
+            setMessage("❗ User not found. Please sign up.", Color.RED);
+            return;
+        }
+
+        if (!DataManager.verifyPassword(username, password)) {
+            setMessage("❗ Incorrect password!", Color.RED);
+            return;
+        }
+
+        User user = DataManager.loadUser(username);
+        if (user == null) {
+            setMessage("⚠ Could not load user data.", Color.RED);
+            return;
+        }
+
+        setMessage("✅ Welcome back, " + username + "!", new Color(0, 128, 0));
+        openMainMenu(user);
+    }
+
+    private void signUp() {
+        String username = usernameField.getText().trim();
+        String password = new String(passwordField.getPassword());
+
+        if (username.isEmpty() || password.isEmpty()) {
+            setMessage("❗ Username and password required!", Color.RED);
+            return;
+        }
+
+        if (DataManager.userExists(username)) {
+            setMessage("❗ Username already taken.", Color.RED);
+            return;
+        }
+
+        User newUser = new User(username);
+        DataManager.saveUser(newUser);
+        DataManager.savePassword(username, password);
+
+        setMessage("🎉 Account created!", new Color(0, 128, 0));
+        openMainMenu(newUser);
+    }
+
+    private void setMessage(String msg, Color color) {
+        messageLabel.setText(msg);
+        messageLabel.setForeground(color);
+    }
+
+    private void openMainMenu(User user) {
+        dispose();
+        SwingUtilities.invokeLater(() -> new MainMenu(user));
+
+    }
+}
+
+//ui->GlobalLeaderboardScreen
+import com.google.firebase.database.*;
+import javax.swing.*;
+import javax.swing.table.DefaultTableCellRenderer;
+import javax.swing.table.DefaultTableModel;
+import java.awt.*;
+import java.util.ArrayList;
+import java.util.List;
+
+public class GlobalLeaderboardScreen extends JFrame {
+
+    public GlobalLeaderboardScreen() {
+        setTitle("🌍 Global Leaderboard");
+        setSize(700, 450);
+        setLocationRelativeTo(null);
+        setDefaultCloseOperation(DISPOSE_ON_CLOSE);
+        getContentPane().setBackground(new Color(173, 216, 230)); // Light blue
+        setLayout(new BorderLayout(10, 10));
+
+        JLabel titleLabel = new JLabel("🌍 Global Leaderboard", SwingConstants.CENTER);
+        titleLabel.setFont(new Font("Monospaced", Font.BOLD, 24));
+        titleLabel.setForeground(Color.WHITE);
+        titleLabel.setOpaque(true);
+        titleLabel.setBackground(new Color(199, 21, 133)); // Dark pink
+        titleLabel.setBorder(BorderFactory.createLineBorder(Color.WHITE, 2));
+        titleLabel.setPreferredSize(new Dimension(700, 50));
+        add(titleLabel, BorderLayout.NORTH);
+
+        String[] columns = {"🏅 Rank", "👤 Username", "🧪 Level", "⭐ XP", "✅ Tasks"};
+        DefaultTableModel tableModel = new DefaultTableModel(columns, 0) {
+            @Override
+            public boolean isCellEditable(int row, int column) {
+                return false; // make table read-only
+            }
+        };
+
+        JTable leaderboardTable = new JTable(tableModel);
+        leaderboardTable.setFont(new Font("Monospaced", Font.PLAIN, 14));
+        leaderboardTable.setRowHeight(28);
+        leaderboardTable.getTableHeader().setFont(new Font("Monospaced", Font.BOLD, 15));
+        leaderboardTable.getTableHeader().setBackground(new Color(147, 112, 219));
+        leaderboardTable.getTableHeader().setForeground(Color.WHITE);
+
+        // Center-align all cells
+        DefaultTableCellRenderer centerRenderer = new DefaultTableCellRenderer();
+        centerRenderer.setHorizontalAlignment(JLabel.CENTER);
+        for (int i = 0; i < leaderboardTable.getColumnCount(); i++) {
+            leaderboardTable.getColumnModel().getColumn(i).setCellRenderer(centerRenderer);
+        }
+
+        JScrollPane scrollPane = new JScrollPane(leaderboardTable);
+        scrollPane.setBorder(BorderFactory.createTitledBorder("📊 Rankings"));
+        add(scrollPane, BorderLayout.CENTER);
+
+        JButton closeBtn = createStyledButton("❌ Close");
+        closeBtn.addActionListener(e -> dispose());
+
+        JPanel bottomPanel = new JPanel();
+        bottomPanel.setOpaque(false);
+        bottomPanel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
+        bottomPanel.add(closeBtn);
+        add(bottomPanel, BorderLayout.SOUTH);
+
+        loadLeaderboardData(tableModel);
+
+        setVisible(true);
+    }
+
+    private void loadLeaderboardData(DefaultTableModel tableModel) {
+        DatabaseReference ref = FirebaseDatabase.getInstance().getReference("leaderboard");
+
+        ref.addListenerForSingleValueEvent(new ValueEventListener() {
+            @Override
+            public void onDataChange(DataSnapshot snapshot) {
+                List<UserData> users = new ArrayList<>();
+
+                for (DataSnapshot child : snapshot.getChildren()) {
+                    String username = child.getKey();
+                    Integer level = child.child("level").getValue(Integer.class);
+                    Integer xp = child.child("xp").getValue(Integer.class);
+                    Integer completedTasks = child.child("completedTasks").getValue(Integer.class);
+
+                    if (username != null && level != null && xp != null && completedTasks != null) {
+                        users.add(new UserData(username, level, xp, completedTasks));
+                    }
+                }
+
+                // Sort by level, then XP
+                users.sort((u1, u2) -> {
+                    if (u2.getLevel() != u1.getLevel()) {
+                        return Integer.compare(u2.getLevel(), u1.getLevel());
+                    } else {
+                        return Integer.compare(u2.getXp(), u1.getXp());
+                    }
+                });
+
+                SwingUtilities.invokeLater(() -> {
+                    tableModel.setRowCount(0); // clear table
+                    int rank = 1;
+                    for (UserData user : users) {
+                        tableModel.addRow(new Object[]{
+                                rank++, user.getUsername(), user.getLevel(), user.getXp(), user.getCompletedTasks()
+                        });
+                    }
+                });
+            }
+
+            @Override
+            public void onCancelled(DatabaseError error) {
+                JOptionPane.showMessageDialog(GlobalLeaderboardScreen.this,
+                        "Failed to load leaderboard data.", "Error", JOptionPane.ERROR_MESSAGE);
+            }
+        });
+    }
+
+    private JButton createStyledButton(String text) {
+        JButton button = new JButton(text);
+        button.setFocusPainted(false);
+        button.setBackground(new Color(147, 112, 219));
+        button.setForeground(Color.WHITE);
+        button.setFont(new Font("Monospaced", Font.BOLD, 14));
+        button.setBorder(BorderFactory.createLineBorder(Color.BLACK, 2));
+        return button;
+    }
+
+    // Helper class
+    private static class UserData {
+        private final String username;
+        private final int level;
+        private final int xp;
+        private final int completedTasks;
+
+        public UserData(String username, int level, int xp, int completedTasks) {
+            this.username = username;
+            this.level = level;
+            this.xp = xp;
+            this.completedTasks = completedTasks;
+        }
+
+        public String getUsername() { return username; }
+        public int getLevel() { return level; }
+        public int getXp() { return xp; }
+        public int getCompletedTasks() { return completedTasks; }
+    }
+}
+//ui->LeaderboardScreen
+package ui;
+
+import models.User;
+
+import javax.swing.*;
+import javax.swing.table.DefaultTableModel;
+import java.awt.*;
+import java.util.Comparator;
+import java.util.List;
+
+public class LeaderboardScreen extends JFrame {
+
+    public LeaderboardScreen(List<User> users) {
+        setTitle("Leaderboard");
         setSize(500, 400);
         setLocationRelativeTo(null);
+        setDefaultCloseOperation(DISPOSE_ON_CLOSE);
         setLayout(new BorderLayout());
 
-        JButton addTask = new JButton("Add Task");
-        JButton completeTask = new JButton("Complete Task");
-        JButton deleteTask = new JButton("Delete Task");
+        String[] columns = {"Username", "Level", "XP", "Coins"};
+        DefaultTableModel model = new DefaultTableModel(columns, 0);
 
-        // Add Task logic
-        addTask.addActionListener(e -> {
+        // Sort by Level, then XP, then Coins (all descending)
+        users.stream()
+                .sorted(Comparator
+                        .comparingInt((User u) -> u.getLevel()).reversed()
+                        .thenComparingInt(u -> -u.getXp())
+                        .thenComparingInt(u -> -u.getCoins()))
+                .forEach(user -> model.addRow(new Object[]{
+                        user.getUsername(), user.getLevel(), user.getXp(), user.getCoins()
+                }));
+
+        JTable table = new JTable(model);
+        table.setFont(new Font("Monospaced", Font.PLAIN, 13));
+        table.setRowHeight(24);
+        table.setEnabled(false);
+        table.getTableHeader().setFont(new Font("Monospaced", Font.BOLD, 14));
+
+        JLabel title = new JLabel("\uD83C\uDFC6 Leaderboard", SwingConstants.CENTER);
+        title.setFont(new Font("Monospaced", Font.BOLD, 18));
+        title.setBorder(BorderFactory.createEmptyBorder(10, 0, 10, 0));
+
+        add(title, BorderLayout.NORTH);
+        add(new JScrollPane(table), BorderLayout.CENTER);
+
+        setVisible(true);
+}
+}
+//ui->LeaderboardTableModel
+package ui;
+
+import models.User;
+
+import javax.swing.table.AbstractTableModel;
+import java.util.ArrayList;
+import java.util.List;
+
+public class LeaderboardTableModel extends AbstractTableModel {
+    private final String[] columns = {"Rank", "Username", "XP", "Level"};
+    private List<User> users = new ArrayList<>();
+
+    public void setUsers(List<User> users) {
+        this.users = users;
+        fireTableDataChanged();
+    }
+
+    @Override
+    public int getRowCount() {
+        return users.size();
+    }
+
+    @Override
+    public int getColumnCount() {
+        return columns.length;
+    }
+
+    @Override
+    public String getColumnName(int col) {
+        return columns[col];
+    }
+
+    @Override
+    public Object getValueAt(int rowIndex, int columnIndex) {
+        User user = users.get(rowIndex);
+        return switch (columnIndex) {
+            case 0 -> rowIndex + 1; // Rank
+            case 1 -> user.getUsername();
+            case 2 -> user.getXp();
+            case 3 -> user.getLevel();
+            default -> null;
+        };
+    }
+}
+//ui->MultiplayerLoginScreen
+package ui;
+
+import models.User;
+import util.DataManager;
+
+import javax.swing.*;
+import java.awt.*;
+import java.util.ArrayList;
+import java.util.List;
+
+public class MultiplayerLoginScreen extends JFrame {
+    private final int maxPlayers;
+    private int currentPlayer = 1;
+    private final List<User> loggedInUsers = new ArrayList<>();
+
+    private final JTextField usernameField = new JTextField(15);
+    private final JPasswordField passwordField = new JPasswordField(15);
+    private final JLabel messageLabel = new JLabel(" ");
+
+    public MultiplayerLoginScreen(int maxPlayers) {
+        this.maxPlayers = maxPlayers;
+        setupUI();
+        promptNextPlayer();
+    }
+
+    private void setupUI() {
+        setTitle("🤝 Multiplayer Login - Study Leveling");
+        setSize(420, 320);
+        setDefaultCloseOperation(DISPOSE_ON_CLOSE);
+        setLocationRelativeTo(null);
+        getContentPane().setBackground(new Color(173, 216, 230));
+        setLayout(new GridBagLayout());
+
+        GridBagConstraints gbc = new GridBagConstraints();
+        gbc.insets = new Insets(10, 12, 10, 12);
+        gbc.anchor = GridBagConstraints.WEST;
+
+        JLabel titleLabel = new JLabel("🎮 Player Login");
+        titleLabel.setFont(new Font("Monospaced", Font.BOLD, 20));
+        titleLabel.setForeground(new Color(199, 21, 133));
+        gbc.gridx = 0;
+        gbc.gridy = 0;
+        gbc.gridwidth = 2;
+        gbc.anchor = GridBagConstraints.CENTER;
+        add(titleLabel, gbc);
+
+        gbc.anchor = GridBagConstraints.EAST;
+        gbc.gridwidth = 1;
+
+        // Username
+        gbc.gridy = 1;
+        gbc.gridx = 0;
+        add(new JLabel("👤 Username:"), gbc);
+
+        gbc.gridx = 1;
+        gbc.anchor = GridBagConstraints.WEST;
+        add(usernameField, gbc);
+
+        // Password
+        gbc.gridy = 2;
+        gbc.gridx = 0;
+        gbc.anchor = GridBagConstraints.EAST;
+        add(new JLabel("🔑 Password:"), gbc);
+
+        gbc.gridx = 1;
+        gbc.anchor = GridBagConstraints.WEST;
+        add(passwordField, gbc);
+
+        // Buttons
+        JButton signInButton = createStyledButton("🔓 Sign In");
+        JButton guestButton = createStyledButton("🎭 Continue as Guest");
+
+        signInButton.addActionListener(e -> signIn());
+        guestButton.addActionListener(e -> promptGuestUsername());
+
+        JPanel buttonPanel = new JPanel();
+        buttonPanel.setOpaque(false);
+        buttonPanel.add(signInButton);
+        buttonPanel.add(guestButton);
+
+        gbc.gridy = 3;
+        gbc.gridx = 0;
+        gbc.gridwidth = 2;
+        gbc.anchor = GridBagConstraints.CENTER;
+        add(buttonPanel, gbc);
+
+        // Message label
+        messageLabel.setFont(new Font("Monospaced", Font.PLAIN, 13));
+        messageLabel.setForeground(Color.RED);
+        gbc.gridy = 4;
+        gbc.insets = new Insets(10, 10, 0, 10);
+        add(messageLabel, gbc);
+
+        setVisible(true);
+    }
+
+    private void promptNextPlayer() {
+        usernameField.setText("");
+        passwordField.setText("");
+        messageLabel.setText("🎯 Player " + currentPlayer + ": Sign in or join as guest");
+    }
+
+    private void signIn() {
+        String username = usernameField.getText().trim();
+        String password = new String(passwordField.getPassword());
+
+        if (username.isEmpty() || password.isEmpty()) {
+            messageLabel.setText("⚠️ Please enter both username and password.");
+            return;
+        }
+
+        if (!DataManager.userExists(username)) {
+            messageLabel.setText("❌ User not found. Sign up first.");
+            return;
+        }
+
+        if (!DataManager.verifyPassword(username, password)) {
+            messageLabel.setText("❌ Incorrect password.");
+            return;
+        }
+
+        User user = DataManager.loadUser(username);
+        if (user == null) {
+            messageLabel.setText("⚠️ Failed to load user data.");
+            return;
+        }
+
+        loggedInUsers.add(user);
+        nextOrLaunch();
+    }
+
+    private void promptGuestUsername() {
+        String guestName = JOptionPane.showInputDialog(
+                this,
+                "Enter a name for Guest Player " + currentPlayer + ":",
+                "Guest Login",
+                JOptionPane.PLAIN_MESSAGE
+        );
+
+        if (guestName != null && !guestName.trim().isEmpty()) {
+            continueAsGuest(guestName.trim());
+        } else {
+            messageLabel.setText("⚠️ Guest name cannot be empty.");
+        }
+    }
+
+    private void continueAsGuest(String name) {
+        User guest = new User(name);
+        loggedInUsers.add(guest);
+        nextOrLaunch();
+    }
+
+    private void nextOrLaunch() {
+        if (currentPlayer < maxPlayers) {
+            currentPlayer++;
+            promptNextPlayer();
+        } else {
+            dispose();
+            new MultiplayerStudyScreen(loggedInUsers);
+        }
+    }
+
+    private JButton createStyledButton(String text) {
+        JButton button = new JButton(text);
+        button.setFocusPainted(false);
+        button.setBackground(new Color(147, 112, 219));
+        button.setForeground(Color.WHITE);
+        button.setFont(new Font("Monospaced", Font.BOLD, 13));
+        button.setBorder(BorderFactory.createLineBorder(Color.BLACK, 2));
+        return button;
+    }
+}
+
+//ui->MultiplayerStudyScreen
+
+package ui;
+
+import models.Task;
+import models.User;
+import util.DataManager;
+
+import javax.swing.*;
+import java.awt.*;
+import java.util.List;
+
+public class MultiplayerStudyScreen extends JFrame {
+    private final List<User> users;
+
+    public MultiplayerStudyScreen(List<User> users) {
+        this.users = users;
+        setTitle("🤝 Multiplayer Study Mode");
+        setSize(1000, 650);
+        setLocationRelativeTo(null);
+        setDefaultCloseOperation(DISPOSE_ON_CLOSE);
+        getContentPane().setBackground(new Color(173, 216, 230)); // Light blue
+
+        JTabbedPane tabbedPane = new JTabbedPane();
+        for (User user : users) {
+            JPanel panel = createUserPanel(user);
+            tabbedPane.addTab("👤 " + user.getUsername(), panel);
+        }
+
+        JButton leaderboardBtn = createStyledButton("🏆 Leaderboard");
+        leaderboardBtn.addActionListener(e -> new LeaderboardScreen(users));
+
+        JPanel bottomPanel = new JPanel();
+        bottomPanel.setOpaque(false);
+        bottomPanel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
+        bottomPanel.add(leaderboardBtn);
+
+        setLayout(new BorderLayout(10, 10));
+        add(tabbedPane, BorderLayout.CENTER);
+        add(bottomPanel, BorderLayout.SOUTH);
+
+        setVisible(true);
+    }
+
+    private JPanel createUserPanel(User user) {
+        JPanel panel = new JPanel();
+        panel.setLayout(new BorderLayout(10, 10));
+        panel.setBackground(new Color(173, 216, 230));
+        panel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
+
+        // === Task List ===
+        DefaultListModel<Task> model = new DefaultListModel<>();
+        JList<Task> taskList = new JList<>(model);
+        user.getTasks().forEach(model::addElement);
+        taskList.setFont(new Font("Monospaced", Font.PLAIN, 14));
+        JScrollPane scrollPane = new JScrollPane(taskList);
+        scrollPane.setBorder(BorderFactory.createTitledBorder("📋 Tasks"));
+
+        // === Input Fields ===
+        JTextField taskField = new JTextField(20);
+        JTextField xpField = new JTextField("50", 4);
+        JTextField coinField = new JTextField("20", 4);
+        JComboBox<Task.Difficulty> difficultyBox = new JComboBox<>(Task.Difficulty.values());
+
+        JButton add = createStyledButton("➕ Add Task");
+        JButton complete = createStyledButton("✅ Complete Task");
+
+        JPanel inputPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
+        inputPanel.setOpaque(false);
+        inputPanel.setBorder(BorderFactory.createTitledBorder("📝 Add New Task"));
+        inputPanel.add(taskField);
+        inputPanel.add(new JLabel("⭐ XP:"));
+        inputPanel.add(xpField);
+        inputPanel.add(new JLabel("💰 Coins:"));
+        inputPanel.add(coinField);
+        inputPanel.add(new JLabel("⚙ Difficulty:"));
+        inputPanel.add(difficultyBox);
+        inputPanel.add(add);
+
+        JPanel buttonPanel = new JPanel();
+        buttonPanel.setOpaque(false);
+        buttonPanel.add(complete);
+
+        JPanel listPanel = new JPanel(new BorderLayout());
+        listPanel.setOpaque(false);
+        listPanel.add(scrollPane, BorderLayout.CENTER);
+        listPanel.add(buttonPanel, BorderLayout.SOUTH);
+
+        panel.add(inputPanel, BorderLayout.NORTH);
+        panel.add(listPanel, BorderLayout.CENTER);
+
+        // === Event Handlers ===
+        add.addActionListener(e -> {
             String desc = taskField.getText().trim();
             if (!desc.isEmpty()) {
                 try {
-                    int xp = Integer.parseInt(xpField.getText().trim());
-                    int coins = Integer.parseInt(coinField.getText().trim());
-                    taskListModel.addElement(new Task(desc, xp, coins));
+                    int xp = Integer.parseInt(xpField.getText());
+                    int coins = Integer.parseInt(coinField.getText());
+                    Task.Difficulty diff = (Task.Difficulty) difficultyBox.getSelectedItem();
+                    Task task = new Task(desc, xp, coins, diff);
+                    user.getTasks().add(task);
+                    model.addElement(task);
                     taskField.setText("");
+                    DataManager.saveUser(user);
                 } catch (NumberFormatException ex) {
                     JOptionPane.showMessageDialog(this, "XP and Coins must be numbers.");
                 }
             }
         });
 
-        // Complete Task logic
-        completeTask.addActionListener(e -> {
+        complete.addActionListener(e -> {
             Task task = taskList.getSelectedValue();
-            if (task != null && !task.isCompleted) {
-                task.isCompleted = true;
-                MainMenu.user.addXP(task.xpReward);
-                MainMenu.user.coins += task.coinReward;
-
+            if (task != null && !task.isCompleted()) {
+                task.setCompleted(true);
+                user.addXP(task.getXpReward());
+                user.addCoins(task.getCoinReward());
                 JOptionPane.showMessageDialog(this,
-                        "Task Completed!\n+ " + task.xpReward + " XP\n+ " + task.coinReward + " Coins");
-
+                        user.getUsername() + " completed a task! + " +
+                                task.getXpReward() + " XP, + " + task.getCoinReward() + " Coins!");
                 taskList.repaint();
-                mainMenu.refreshStats();
+                DataManager.saveUser(user);
             }
         });
 
-        // Delete Task logic
-        deleteTask.addActionListener(e -> {
-            Task selected = taskList.getSelectedValue();
-            if (selected != null) {
-                taskListModel.removeElement(selected);
+        return panel;
+    }
+
+    private JButton createStyledButton(String text) {
+        JButton button = new JButton(text);
+        button.setFocusPainted(false);
+        button.setBackground(new Color(147, 112, 219));
+        button.setForeground(Color.WHITE);
+        button.setFont(new Font("Monospaced", Font.BOLD, 14));
+        button.setBorder(BorderFactory.createLineBorder(Color.BLACK, 2));
+        return button;
+    }
+}
+//firebase->FirebaseConfig
+package firebase;
+
+import com.google.auth.oauth2.GoogleCredentials;
+import com.google.firebase.FirebaseApp;
+import com.google.firebase.FirebaseOptions;
+import java.io.InputStream;
+
+public class FirebaseConfig {
+    public static void initialize() {
+        try {
+            // Load the service account from resources using classloader
+            InputStream serviceAccount = FirebaseConfig.class.getClassLoader()
+                    .getResourceAsStream("serviceAccountKey.json");
+
+            if (serviceAccount == null) {
+                System.err.println("❌ serviceAccountKey.json not found in resources.");
+                return;
             }
-        });
 
-        // Input Panels
-        JPanel inputPanel = new JPanel(new BorderLayout());
-        JPanel rewardPanel = new JPanel(new GridLayout(1, 4));
-        rewardPanel.add(new JLabel("XP:"));
-        rewardPanel.add(xpField);
-        rewardPanel.add(new JLabel("Coins:"));
-        rewardPanel.add(coinField);
+            FirebaseOptions options = FirebaseOptions.builder()
+                    .setCredentials(GoogleCredentials.fromStream(serviceAccount))
+                    .setDatabaseUrl("https://study-leveling-default-rtdb.asia-southeast1.firebasedatabase.app/")  // replace with your DB URL
+                    .build();
 
-        JPanel topPanel = new JPanel(new BorderLayout());
-        topPanel.add(taskField, BorderLayout.CENTER);
-        topPanel.add(addTask, BorderLayout.EAST);
-        inputPanel.add(topPanel, BorderLayout.NORTH);
-        inputPanel.add(rewardPanel, BorderLayout.SOUTH);
-
-        JPanel buttons = new JPanel();
-        buttons.add(completeTask);
-        buttons.add(deleteTask);
-
-        add(inputPanel, BorderLayout.NORTH);
-        add(new JScrollPane(taskList), BorderLayout.CENTER);
-        add(buttons, BorderLayout.SOUTH);
-
-        setVisible(true);
+            FirebaseApp.initializeApp(options);
+            System.out.println("✅ Firebase initialized successfully.");
+        } catch (Exception e) {
+            System.err.println("❌ Failed to initialize Firebase.");
+            e.printStackTrace();
 }
 }
-//ui->RewardScreen
-package ui;
+}
 
-import models.Reward;
+//firebase->FirebaseLeaderboard
+
+package firebase;
+
+import com.google.firebase.database.DatabaseReference;
+import com.google.firebase.database.FirebaseDatabase;
+import models.Task;
 import models.User;
 
-import javax.swing.*;
-import java.awt.*;
-import java.util.ArrayList;
+public class FirebaseLeaderboard {
 
-public class RewardScreen extends JFrame {
-    private final java.util.List<Reward> rewards = new ArrayList<>();
+    public static void uploadUserStats(User user) {
+        int completed = (int) user.getTasks().stream().filter(Task::isCompleted).count();
 
-    public RewardScreen() {
-        setTitle("Reward Shop");
-        setSize(400, 300);
-        setLayout(new GridLayout(0, 1));
+        DatabaseReference ref = FirebaseDatabase.getInstance()
+                .getReference("leaderboard")
+                .child(user.getUsername()); // Use username as key
 
-        rewards.add(new Reward("Cool Avatar", 100));
-        rewards.add(new Reward("Night Theme", 150));
-        rewards.add(new Reward("Badge of Honor", 200));
-
-        for (Reward r : rewards) {
-            JButton btn = new JButton(r.name + " - " + r.cost + " coins");
-            btn.setEnabled(!r.isUnlocked);
-            btn.addActionListener(e -> {
-                if (MainMenu.user.coins >= r.cost && !r.isUnlocked) {
-                    MainMenu.user.coins -= r.cost;
-                    r.isUnlocked = true;
-                    btn.setText(r.name + " (Unlocked)");
-                    btn.setEnabled(false);
-                } else {
-                    JOptionPane.showMessageDialog(this, "Not enough coins!");
-                }
-            });
-            add(btn);
-        }
-
-        setVisible(true);
+        ref.child("level").setValueAsync(user.getLevel());
+        ref.child("xp").setValueAsync(user.getXp());
+        ref.child("completedTasks").setValueAsync(completed);
 }
 }
-
-//ui->ProgressScreen
-
 //app
-import ui.MainMenu;
+package org.app;
 
-import javax.swing.*;
+import firebase.FirebaseConfig;
+import ui.LoginScreen;
 
 public class App {
     public static void main(String[] args) {
-        SwingUtilities.invokeLater(() -> {
-            new MainMenu();
-        });
+// Initialize Firebase first
+        FirebaseConfig.initialize();
+
+        // Then open the app UI
+        new LoginScreen();
+    }
+//util->DataManager
+package util;
+
+import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
+import com.google.gson.reflect.TypeToken;
+import models.User;
+
+import java.io.*;
+import java.lang.reflect.Type;
+import java.util.HashMap;
+import java.util.Map;
+
+public class DataManager {
+    private static final String USER_DIR = "data/";
+    private static final String PASSWORD_FILE = USER_DIR + "users.json";
+    private static final Gson gson = new GsonBuilder().setPrettyPrinting().create();
+
+    private static Map<String, String> userPasswords = loadPasswordMap();
+
+    static {
+        File dir = new File(USER_DIR);
+        if (!dir.exists()) dir.mkdirs();
+    }
+
+    public static User loadUser(String username) {
+        File file = new File(USER_DIR + username + ".json");
+        if (!file.exists()) return null;
+
+        try (FileReader reader = new FileReader(file)) {
+            User user = gson.fromJson(reader, User.class);
+            System.out.println("Loaded user: " + username);
+            return user;
+        } catch (IOException e) {
+            e.printStackTrace();
+            return null;
+        }
+    }
+
+    public static void saveUser(User user) {
+        try (FileWriter writer = new FileWriter(USER_DIR + user.getUsername() + ".json")) {
+            gson.toJson(user, writer);
+            System.out.println("Saved user: " + user.getUsername());
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+    public static void savePassword(String username, String password) {
+        userPasswords.put(username, password);
+        savePasswordMap();
+    }
+
+    public static boolean userExists(String username) {
+        return loadPasswordMap().containsKey(username);
+    }
+
+    public static boolean verifyPassword(String username, String input) {
+        String savedPassword = loadPasswordMap().get(username);
+        return input.equals(savedPassword);
+    }
+
+    private static Map<String, String> loadPasswordMap() {
+        File file = new File(PASSWORD_FILE);
+        if (!file.exists()) return new HashMap<>();
+        try (FileReader reader = new FileReader(file)) {
+            Type type = new TypeToken<Map<String, String>>() {}.getType();
+            return gson.fromJson(reader, type);
+        } catch (IOException e) {
+            e.printStackTrace();
+            return new HashMap<>();
+        }
+    }
+
+    private static void savePasswordMap() {
+        try (FileWriter writer = new FileWriter(PASSWORD_FILE)) {
+            gson.toJson(userPasswords, writer);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
     }
 }
+//util->TaskSelector
+package util;
 
+import models.Task;
+import java.util.*;
+
+public class TaskSelector {
+
+    public static int getEffort(Task.Difficulty difficulty) {
+        if (difficulty == null) return 0; // Prevent crash
+        switch (difficulty) {
+            case EASY: return 2;
+            case MEDIUM: return 5;
+            case HARD: return 8;
+            default: return 0;
+        }
+    }
+
+    public static int getMaxEffortForLevel(int level) {
+        return 10 + (level - 1) * 5;
+    }
+
+    public static List<Task> selectOptimalTasks(List<Task> tasks, int level) {
+        int maxEffort = getMaxEffortForLevel(level);
+        int n = tasks.size();
+
+        int[] effort = new int[n];
+        int[] value = new int[n];
+        for (int i = 0; i < n; i++) {
+            Task task = tasks.get(i);
+            effort[i] = getEffort(task.getDifficulty());
+            value[i] = task.getXpReward() + task.getCoinReward();
+        }
+
+        boolean[][] dp = new boolean[n + 1][maxEffort + 1];
+        dp[0][0] = true;
+        for (int i = 1; i <= n; i++) {
+            for (int j = 0; j <= maxEffort; j++) {
+                if (j >= effort[i - 1]) {
+                    dp[i][j] = dp[i - 1][j] || dp[i - 1][j - effort[i - 1]];
+                } else {
+                    dp[i][j] = dp[i - 1][j];
+                }
+            }
+        }
+
+        int bestValue = -1;
+        List<Task> bestSet = new ArrayList<>();
+
+        for (int j = maxEffort; j >= 0; j--) {
+            if (dp[n][j]) {
+                List<Task> chosen = new ArrayList<>();
+                int w = j;
+                for (int i = n; i >= 1; i--) {
+                    if (w >= effort[i - 1] && dp[i - 1][w - effort[i - 1]]) {
+                        chosen.add(tasks.get(i - 1));
+                        w -= effort[i - 1];
+                    }
+                }
+
+                int totalValue = chosen.stream()
+                        .mapToInt(t -> t.getXpReward() + t.getCoinReward())
+                        .sum();
+                long hardCount = chosen.stream()
+                        .filter(t -> t.getDifficulty() == Task.Difficulty.HARD)
+                        .count();
+
+                if (totalValue > bestValue ||
+                        (totalValue == bestValue &&
+                                hardCount > bestSet.stream().filter(t -> t.getDifficulty() == Task.Difficulty.HARD).count())) {
+                    bestValue = totalValue;
+                    bestSet = chosen;
+                }
+            }
+        }
+
+        return bestSet;
+}
+}
+//util->FirebaseManager
+package util;
+
+import com.google.firebase.database.DatabaseReference;
+import com.google.firebase.database.FirebaseDatabase;
+import models.Task;
+import models.User;
+
+public class FirebaseManager {
+
+    public static void uploadUserStats(User user) {
+        try {
+            int completedTasks = (int) user.getTasks().stream().filter(Task::isCompleted).count();
+
+            DatabaseReference dbRef = FirebaseDatabase.getInstance()
+                    .getReference("leaderboard")
+                    .child(user.getUsername());  // Use username as unique key
+
+            dbRef.child("level").setValueAsync(user.getLevel());
+            dbRef.child("xp").setValueAsync(user.getXp());
+            dbRef.child("completedTasks").setValueAsync(completedTasks);
+
+            System.out.println("✅ Successfully uploaded user stats to Firebase.");
+        } catch (Exception e) {
+            e.printStackTrace();
+            System.out.println("❌ Failed to upload stats.");
+}
+}
+}
